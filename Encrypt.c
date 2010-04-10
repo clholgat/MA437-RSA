@@ -2,27 +2,38 @@
 #include <math.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <gmp.h>
 
 #define TRUE 1
 #define FALSE 0
 
-typedef long long unsigned int Block;
-typedef long long unsigned int BigInt;
-
-int abCheck(int a, int b, int m);
-int encode(int a, BigInt n, int blockSize, FILE *fp);
-int decode(int b, BigInt n, int blockSize, FILE *fq);
-BigInt largePow(BigInt x, BigInt c, BigInt n);
+int encode(mpz_t a, mpz_t n, int blockSize, FILE *fp);
+int decode(mpz_t b, mpz_t n, int blockSize, FILE *fq);
 
 int main(int argc, char *argv[]){
-	int p = 79;
-	int q = 151;
-	BigInt n = p*q;
-	//printf("%llu\n", n);
-	//int m = (p-1)*(q-1);
-	int a = 473;
-	int b = 8237;
-	int blockSize = 3;
+	mpz_t p;
+	mpz_init_set_str(p, "400043344212007458013", 10);
+	
+	mpz_t q;
+	mpz_init_set_str(q, "500030066366269001203", 10);
+	
+	mpz_t n;
+	mpz_init(n); 
+	mpz_mul(n, p, q);
+	
+	mpz_t m;
+	mpz_init(m);
+	mpz_mul(m, p-1, q-1);
+	
+	mpz_t a;
+	mpz_init_set_str(a, "10098768900987679000910003", 10);
+	
+	mpz_t b;
+	mpz_init(b);
+	mpz_invert(b, a, m);
+	
+	int blockSize = 1;
 	
 	FILE *fp = fopen("Encrypt.c", "r");
 	encode(a, n, blockSize, fp);
@@ -30,86 +41,78 @@ int main(int argc, char *argv[]){
 	FILE *fq = fopen("encrypted.txt", "r");
 	decode(b, n, blockSize, fq);
 
-	//printf("%d",abCheck(a,b, m));
-	
 	return 1;
 }
 
-int abCheck(int a, int b, int m){
-	return (fmod(a*b, m) == 1) ? TRUE: FALSE;
-}
-
-int encode(int a, BigInt n, int blockSize, FILE *fp){
+int encode(mpz_t a, mpz_t n, int blockSize, FILE *fp){
 	FILE *fq = fopen("encrypted.txt", "w+");	
 
-	Block block = 0;	
-	unsigned long int x = 0;
+	mpz_t block;	
+	int x[blockSize];
 	int done = FALSE;
 	while(!done){
+		mpz_init(block);
 		for( int i = 0; i < blockSize; i++ ){
-			x = (int)getc(fp);
-			//printf("%lu \n", x);
-			if( x != (unsigned long)(-1)){			
-				block += x;
-				//printf("%llx \n", block);
-				if(i != (blockSize - 1)){
-					block <<= (CHAR_BIT);
-				}
-			}
-			else{
+			x[i] = fgetc(fp);
+			if( x[i] == EOF){			
 				for( int j = i; j<blockSize; j++){
-					block += rand()%255;
-					if(j != (blockSize - 1)){
-						block <<= (CHAR_BIT);
-					}
-				}
-				done = TRUE;
+					x[j] = rand()%127;
+					done = TRUE;
+				}	
 			}
 		}
-		fprintf(fq, "%llu ", (BigInt)largePow(x,a,n));
-		printf("%d ", (int)block);
-		printf("%d \n", (int)largePow(x, a, n));
-		block = 0;
+		for( int i = 0; i < blockSize; i++ ){
+			mpz_add_ui(block, block, (unsigned long) x[i]);
+			if( i < (blockSize -1)){
+				mpz_mul_2exp(block, block, (unsigned long) CHAR_BIT);
+			}
+		}
+		printf("%d", mpz_cmp(n, block));
+		
+		mpz_powm(block, block, a, n);
+		mpz_out_str(fq, 16, block);
+		fprintf(fq, "\n");
+		
+		mpz_clear(block);
 	}
+	
+	
 	fclose(fq);
 	return TRUE;
 }
 
-int decode(int b, BigInt n, int blockSize, FILE *fq){
+int decode(mpz_t b, mpz_t n, int blockSize, FILE *fq){
 	FILE *fr = fopen("decrypted.txt", "w+");
+	assert(fr != NULL);
+	mpz_t y;
+	mpz_init(y);
+	mpz_t mask;
+	unsigned long maskbits = pow(2, CHAR_BIT) -1;
+	mpz_init_set_ui(mask, maskbits);
+	mpz_t chunk;
 	
-	int y = 0;
 	int done = FALSE;
-	int chunk = pow(2, CHAR_BIT) -1;
-	while(fscanf(fq, "%d", &y) != EOF){
-		//printf("Starting decrypt \n");
-		if( y != (-1)){
-			y =fmod(pow(y, b), n);
-			for( int i = 0 ; i < blockSize; i++){
-				fprintf(fr, "%c", (char)(y & chunk));
-				y >>= (CHAR_BIT*2);
-			}
-		}else{
-			done = TRUE;
+	int x[blockSize];
+	
+	while(!feof(fq)){
+		mpz_init(chunk);
+		gmp_fscanf(fq, "%Zx", y);
+		mpz_powm(y, y, b, n);
+		for( int i = 0; i < blockSize; i++){
+			mpz_and(chunk, mask, y);
+			x[i] = (int)mpz_get_ui(chunk);
+			mpz_tdiv_q_2exp(y, y, (unsigned long) CHAR_BIT);
+		}	
+		for( int i = (blockSize -1); i >= 0; i--){
+			fprintf(fr, "%d ", x[i]);
 		}
+		
+		mpz_clear(chunk);
+		//done = TRUE;
 	}
 	return TRUE;
 }
 
-BigInt largePow(BigInt x, BigInt c, BigInt n){
-	BigInt bit = 1;
-	BigInt runTot = 1;
-	
-	for(int i = 0; i < (sizeof(c)*2); i++){
-		if( (c & bit) != 0){
-			runTot *= fmod(pow(x,pow(2,i)), n);
-			runTot = fmod(runTot, n);
-		}
-		bit <<= 1;
-		printf("largePow: runTot = %llu \n", runTot);
-	}
-	return runTot;
-}
-			 
+		 
 				
 	
