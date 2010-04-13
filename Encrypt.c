@@ -8,6 +8,7 @@
 #define TRUE 1
 #define FALSE 0
 
+int checkSystem(mpz_t p, mpz_t q, mpz_t a, mpz_t b, mpz_t n, mpz_t m);
 int encode(mpz_t a, mpz_t n, int blockSize, FILE *fp);
 int decode(mpz_t b, mpz_t n, int blockSize, FILE *fq);
 
@@ -21,21 +22,32 @@ int main(int argc, char *argv[]){
 	mpz_t n;
 	mpz_init(n); 
 	mpz_mul(n, p, q);
+	gmp_printf("n: %Zx\n", n);
 	
-	mpz_t m;
+	mpz_t m, qq, pp;
 	mpz_init(m);
-	mpz_mul(m, p-1, q-1);
+	mpz_init(qq);
+	mpz_init(pp);
+	mpz_sub_ui(qq, q, 1);
+	mpz_sub_ui(pp, p, 1);	
+	mpz_mul(m, pp, qq);
 	
 	mpz_t a;
 	mpz_init_set_str(a, "10098768900987679000910003", 10);
+	gmp_printf("a: %Zx\n", a);
 	
 	mpz_t b;
 	mpz_init(b);
 	mpz_invert(b, a, m);
+	gmp_printf("m: %Zx\n", m);
+	gmp_printf("b: %Zx\n", b);
 	
-	int blockSize = 1;
 	
-	FILE *fp = fopen("Encrypt.c", "r");
+	checkSystem(p, q, a, b, n, m);
+	
+	int blockSize = 3;
+	
+	FILE *fp = fopen("SampleText.txt", "r");
 	encode(a, n, blockSize, fp);
 	
 	FILE *fq = fopen("encrypted.txt", "r");
@@ -43,6 +55,33 @@ int main(int argc, char *argv[]){
 
 	return 1;
 }
+
+int checkSystem(mpz_t p, mpz_t q, mpz_t a, mpz_t b, mpz_t n, mpz_t m){
+	assert( mpz_probab_prime_p(p, 10) != 0);
+	assert( mpz_probab_prime_p(q, 10) != 0);
+	
+	mpz_t gcd;
+	mpz_init(gcd);	assert( mpz_probab_prime_p(q, 10) != 0);
+	mpz_gcd(gcd, a, m);
+	assert( mpz_cmp_ui(gcd, 1) == 0);
+	mpz_clear(gcd);
+	
+	mpz_t abCheck;
+	mpz_init(abCheck);
+	mpz_mul(abCheck, a, b);
+	mpz_powm_ui(abCheck, abCheck, 1, m);
+	assert( mpz_cmp_ui(abCheck, 1) == 0);
+	mpz_clear(abCheck);
+	
+	mpz_t pqCheck;
+	mpz_init(pqCheck);
+	mpz_mul(pqCheck, p, q);
+	assert( mpz_cmp(pqCheck, n) == 0);
+	
+	return TRUE;
+}
+	
+	 
 
 int encode(mpz_t a, mpz_t n, int blockSize, FILE *fp){
 	FILE *fq = fopen("encrypted.txt", "w+");	
@@ -56,18 +95,19 @@ int encode(mpz_t a, mpz_t n, int blockSize, FILE *fp){
 			x[i] = fgetc(fp);
 			if( x[i] == EOF){			
 				for( int j = i; j<blockSize; j++){
-					x[j] = rand()%127;
+					//x[j] = rand()%127;
+					x[j] = 0;
 					done = TRUE;
-				}	
+				}
+				break;
 			}
 		}
 		for( int i = 0; i < blockSize; i++ ){
 			mpz_add_ui(block, block, (unsigned long) x[i]);
-			if( i < (blockSize -1)){
+			if( i < (blockSize-1)){
 				mpz_mul_2exp(block, block, (unsigned long) CHAR_BIT);
 			}
 		}
-		printf("%d", mpz_cmp(n, block));
 		
 		mpz_powm(block, block, a, n);
 		mpz_out_str(fq, 16, block);
@@ -86,25 +126,31 @@ int decode(mpz_t b, mpz_t n, int blockSize, FILE *fq){
 	assert(fr != NULL);
 	mpz_t y;
 	mpz_init(y);
+	
+	mpz_t scanner;
+	mpz_init(scanner);
+	
 	mpz_t mask;
 	unsigned long maskbits = pow(2, CHAR_BIT) -1;
 	mpz_init_set_ui(mask, maskbits);
 	mpz_t chunk;
 	
-	int done = FALSE;
+	//int done = FALSE;
 	int x[blockSize];
 	
 	while(!feof(fq)){
 		mpz_init(chunk);
-		gmp_fscanf(fq, "%Zx", y);
-		mpz_powm(y, y, b, n);
+		gmp_fscanf(fq, "%Zx", scanner);
+		gmp_printf("ScannedNum: %Zx\n", scanner);
+		mpz_powm(y, scanner, b, n);
+		gmp_printf("PlainStuff: %Zx\n", y);
 		for( int i = 0; i < blockSize; i++){
 			mpz_and(chunk, mask, y);
 			x[i] = (int)mpz_get_ui(chunk);
 			mpz_tdiv_q_2exp(y, y, (unsigned long) CHAR_BIT);
 		}	
 		for( int i = (blockSize -1); i >= 0; i--){
-			fprintf(fr, "%d ", x[i]);
+			fprintf(fr, "%c", x[i]);
 		}
 		
 		mpz_clear(chunk);
