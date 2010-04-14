@@ -30,7 +30,7 @@ int main(int argc, char *argv[]){
      		new_xab( x, a, b, beta, g, P, Zp );
      		new_xab( X, A, B, beta, g, P, Zp ); 
      		new_xab( X, A, B, beta, g, P, Zp );
-     		printf( "%x  %Zx %Zx %Zx  %Zx %Zx %Zx\n", i, x, a, b, X, A, B );
+     		gmp_printf( "%d  %Zd %Zd %Zd  %Zd %Zd %Zd\n", i, x, a, b, X, A, B );
      		if( !mpz_cmp(x, X) ){ 
      			break;
    		}
