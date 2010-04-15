@@ -22,7 +22,6 @@ int main(int argc, char *argv[]){
 	mpz_t n;
 	mpz_init(n); 
 	mpz_mul(n, p, q);
-	gmp_printf("%Zd", n);
 	
 	mpz_t m, qq, pp;
 	mpz_init(m);
@@ -38,6 +37,7 @@ int main(int argc, char *argv[]){
 	mpz_t b;
 	mpz_init(b);
 	mpz_invert(b, a, m);
+	gmp_printf("b: %Zx\n", b);
 	
 	checkSystem(p, q, a, b, n, m);
 	
