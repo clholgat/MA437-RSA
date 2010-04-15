@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
 	mpz_t n;
 	mpz_init(n); 
 	mpz_mul(n, p, q);
-	gmp_printf("n: %Zx\n", n);
+	gmp_printf("%Zd", n);
 	
 	mpz_t m, qq, pp;
 	mpz_init(m);
@@ -34,22 +34,20 @@ int main(int argc, char *argv[]){
 	
 	mpz_t a;
 	mpz_init_set_str(a, "10098768900987679000910003", 10);
-	gmp_printf("a: %Zx\n", a);
 	
 	mpz_t b;
 	mpz_init(b);
 	mpz_invert(b, a, m);
-	gmp_printf("m: %Zx\n", m);
-	gmp_printf("b: %Zx\n", b);
-	
 	
 	checkSystem(p, q, a, b, n, m);
 	
 	int blockSize = 3;
 	
+	//File to be encrypted
 	FILE *fp = fopen("SampleText.txt", "r");
 	encode(a, n, blockSize, fp);
 	
+	//File to be decrypted
 	FILE *fq = fopen("encrypted.txt", "r");
 	decode(b, n, blockSize, fq);
 
@@ -95,7 +93,6 @@ int encode(mpz_t a, mpz_t n, int blockSize, FILE *fp){
 			x[i] = fgetc(fp);
 			if( x[i] == EOF){			
 				for( int j = i; j<blockSize; j++){
-					//x[j] = rand()%127;
 					x[j] = 0;
 					done = TRUE;
 				}
@@ -141,9 +138,7 @@ int decode(mpz_t b, mpz_t n, int blockSize, FILE *fq){
 	while(!feof(fq)){
 		mpz_init(chunk);
 		gmp_fscanf(fq, "%Zx", scanner);
-		gmp_printf("ScannedNum: %Zx\n", scanner);
 		mpz_powm(y, scanner, b, n);
-		gmp_printf("PlainStuff: %Zx\n", y);
 		for( int i = 0; i < blockSize; i++){
 			mpz_and(chunk, mask, y);
 			x[i] = (int)mpz_get_ui(chunk);
@@ -154,7 +149,6 @@ int decode(mpz_t b, mpz_t n, int blockSize, FILE *fq){
 		}
 		
 		mpz_clear(chunk);
-		//done = TRUE;
 	}
 	return TRUE;
 }
