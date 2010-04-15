@@ -43,11 +43,12 @@ int main(int argc, char *argv[]){
 	
 	int blockSize = 3;
 	
-	//File to be encrypted
+
+        // File to be encrypted
 	FILE *fp = fopen("SampleText.txt", "r");
 	encode(a, n, blockSize, fp);
 	
-	//File to be decrypted
+        //File to be decrypted
 	FILE *fq = fopen("encrypted.txt", "r");
 	decode(b, n, blockSize, fq);
 
