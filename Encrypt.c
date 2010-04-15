@@ -37,7 +37,6 @@ int main(int argc, char *argv[]){
 	mpz_t b;
 	mpz_init(b);
 	mpz_invert(b, a, m);
-	gmp_printf("b: %Zx\n", b);
 	
 	checkSystem(p, q, a, b, n, m);
 	
